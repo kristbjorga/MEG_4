@@ -13,7 +13,7 @@
       display: flex;
     }
 
-    /* LEFT SIDE */
+    /* LEFT */
     .left {
       width: 50%;
       display: flex;
@@ -22,7 +22,7 @@
       background: #f0f0f0;
     }
 
-    /* RIGHT SIDE */
+    /* RIGHT */
     .right {
       width: 50%;
       padding: 20px;
@@ -30,10 +30,6 @@
       border-left: 2px solid black;
       box-sizing: border-box;
       overflow-y: auto;
-    }
-
-    .right h2 {
-      margin-top: 0;
     }
 
     /* CIRCLE */
@@ -72,13 +68,13 @@
       z-index: 10;
     }
 
-    .diag-line {
+    .diag {
       position: absolute;
       top: 50%;
       left: 50%;
       width: 600px;
       height: 2px;
-      background: red;
+      background: black;
       transform: translate(-50%, -50%) rotate(54deg);
       z-index: 10;
     }
@@ -128,7 +124,7 @@
       border-radius: 4px;
       white-space: nowrap;
       opacity: 0;
-      transition: opacity 0.2s;
+      transition: 0.2s;
       pointer-events: none;
       z-index: 50;
     }
@@ -156,7 +152,6 @@
     .no-data {
       color: darkred;
       font-weight: bold;
-      font-size: 18px;
     }
   </style>
 </head>
@@ -166,7 +161,7 @@
   <!-- LEFT -->
   <div class="left">
     <div class="circle">
-      <div class="diag-line"></div>
+      <div class="diag"></div>
       <div class="grid" id="grid"></div>
     </div>
   </div>
@@ -178,18 +173,6 @@
   </div>
 
   <script>
-  let existingFolders = new Set();
-
-async function loadFolderIndex() {
-  try {
-    const res = await fetch("data/index.json");
-    const list = await res.json();
-    existingFolders = new Set(list);
-  } catch (e) {
-    console.warn("No index.json found");
-  }
-}
-  
     const grid = document.getElementById("grid");
     const title = document.getElementById("title");
     const content = document.getElementById("content");
@@ -198,20 +181,30 @@ async function loadFolderIndex() {
     const cols = 15;
 
     let selected = null;
-    let currentText = null;
+    let existingFolders = new Set();
 
-    // LOAD FOLDER DATA
+    /* LOAD INDEX OF EXISTING FOLDERS */
+    async function loadIndex() {
+      try {
+        const res = await fetch("data/index.json");
+        const list = await res.json();
+        existingFolders = new Set(list);
+      } catch (e) {
+        console.warn("No index.json found");
+      }
+    }
+
+    /* LOAD FOLDER DATA */
     function loadFolder(r, c) {
       const folder = `data/${r}_${c}`;
       title.textContent = `${r}_${c}`;
       content.innerHTML = `<p>Loading...</p>`;
-      currentText = null;
 
       let loaded = 0;
-      let validImages = [];
-      let finished = false;
+      let images = [];
+      let currentText = null;
 
-      // TEXT FILE
+      // TEXT
       fetch(`${folder}/info.txt`)
         .then(res => {
           if (!res.ok) throw new Error();
@@ -224,10 +217,10 @@ async function loadFolderIndex() {
       for (let i = 1; i <= 10; i++) {
         const img = new Image();
         img.className = "figure";
-        img.src = `${folder}/fig${i}.jpg`;  
+        img.src = `${folder}/fig${i}.jpg`;
 
         img.onload = () => {
-          validImages.push(img);
+          images.push(img);
           check();
         };
 
@@ -236,61 +229,60 @@ async function loadFolderIndex() {
 
       function check() {
         loaded++;
-
-        if (loaded === 10 && !finished) {
-          finished = true;
-          render();
-        }
+        if (loaded === 10) render();
       }
 
       function render() {
         content.innerHTML = "";
 
-        if (validImages.length === 0) {
+        if (images.length === 0) {
           content.innerHTML = `<p class="no-data">No data measured</p>`;
           return;
-        }let existingFolders = new Set();
+        }
 
-async function loadFolderIndex() {
-  try {
-    const res = await fetch("data/index.json");
-    const list = await res.json();
-    existingFolders = new Set(list);
-  } catch (e) {
-    console.warn("No index.json found");
-  }
-}
+        images.forEach(img => content.appendChild(img));
 
-        validImages.forEach(img => content.appendChild(img));
+        const text = document.createElement("div");
+        text.className = "text-box";
+        text.textContent = currentText || "No description available.";
 
-        const textDiv = document.createElement("div");
-        textDiv.className = "text-box";
-        textDiv.textContent = currentText || "No description available.";
-
-        content.appendChild(textDiv);
+        content.appendChild(text);
       }
     }
 
-    // BUILD GRID
-    for (let r = 1; r <= rows; r++) {
-      for (let c = 1; c <= cols; c++) {
-        const cell = document.createElement("div");
-        cell.className = "cell";
+    /* BUILD GRID */
+    async function build() {
+      await loadIndex();
 
-        cell.textContent = `${r},${c}`;
-        cell.setAttribute("data-info", `Row ${r}, Col ${c}`);
+      for (let r = 1; r <= rows; r++) {
+        for (let c = 1; c <= cols; c++) {
+          const cell = document.createElement("div");
+          cell.className = "cell";
 
-        cell.addEventListener("click", () => {
-          if (selected) selected.classList.remove("selected");
-          cell.classList.add("selected");
-          selected = cell;
+          const key = `${r}_${c}`;
 
-          loadFolder(r, c);
-        });
+          cell.textContent = key;
+          cell.setAttribute("data-info", `Row ${r}, Col ${c}`);
 
-        grid.appendChild(cell);
+          /* GREEN IF EXISTS */
+          if (existingFolders.has(key)) {
+            cell.style.background = "rgba(0,255,0,0.25)";
+          }
+
+          cell.addEventListener("click", () => {
+            if (selected) selected.classList.remove("selected");
+            cell.classList.add("selected");
+            selected = cell;
+
+            loadFolder(r, c);
+          });
+
+          grid.appendChild(cell);
+        }
       }
     }
+
+    build();
   </script>
 
 </body>
