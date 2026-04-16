@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Clickable Circle Grid Info Panel</title>
+  <title>Circle Grid Folder Viewer</title>
 
   <style>
     body {
@@ -13,7 +13,6 @@
       display: flex;
     }
 
-    /* Left side (grid area) */
     .left {
       width: 50%;
       display: flex;
@@ -22,35 +21,19 @@
       background: #f0f0f0;
     }
 
-    /* Right side (info panel) */
     .right {
       width: 50%;
       padding: 20px;
       background: white;
       border-left: 2px solid black;
       box-sizing: border-box;
+      overflow-y: auto;
     }
 
     .right h2 {
       margin-top: 0;
     }
 
-    .info-box {
-      border: 2px solid #ccc;
-      border-radius: 10px;
-      padding: 15px;
-      background: #fafafa;
-    }
-
-    .info-box img {
-      width: 100%;
-      max-width: 350px;
-      border-radius: 10px;
-      display: block;
-      margin-bottom: 15px;
-    }
-
-    /* Circle */
     .circle {
       width: 400px;
       height: 400px;
@@ -61,7 +44,6 @@
       position: relative;
     }
 
-    /* Inner grid */
     .grid {
       width: 100%;
       height: 100%;
@@ -69,7 +51,6 @@
       grid-template-columns: repeat(15, 1fr);
       grid-template-rows: repeat(11, 1fr);
 
-      /* Shift down by 38% of one cell height + rotate 180 degrees */
       transform: translateY(calc((100% / 11) * 0.38)) rotate(180deg);
     }
 
@@ -88,27 +69,26 @@
       background: rgba(255, 150, 0, 0.5);
     }
 
-    /* Tooltip */
-    .cell::after {
-      content: attr(data-info);
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -120%);
-      background: black;
-      color: white;
-      padding: 4px 8px;
-      font-size: 12px;
-      border-radius: 5px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-      z-index: 10;
+    .figure {
+      width: 100%;
+      max-width: 500px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      border: 2px solid #ccc;
     }
 
-    .cell:hover::after {
-      opacity: 1;
+    .no-data {
+      font-size: 18px;
+      color: darkred;
+      font-weight: bold;
+    }
+
+    .details {
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
     }
   </style>
 </head>
@@ -124,68 +104,79 @@
 
   <!-- RIGHT SIDE -->
   <div class="right">
-    <h2>Square Info</h2>
-
-    <div class="info-box">
-      <img id="infoImage" src="https://via.placeholder.com/350" alt="Selected Cell Image">
-      <p><strong>Row:</strong> <span id="infoRow">-</span></p>
-      <p><strong>Column:</strong> <span id="infoCol">-</span></p>
-      <p><strong>Cell Number:</strong> <span id="infoCell">-</span></p>
-      <p><strong>Description:</strong> <span id="infoDesc">Click a square to see details.</span></p>
+    <h2 id="panelTitle">Click a square</h2>
+    <div id="panelContent">
+      <p>Select a square to load data.</p>
     </div>
   </div>
 
   <script>
     const circleGrid = document.getElementById("circleGrid");
-
-    const infoRow = document.getElementById("infoRow");
-    const infoCol = document.getElementById("infoCol");
-    const infoCell = document.getElementById("infoCell");
-    const infoDesc = document.getElementById("infoDesc");
-    const infoImage = document.getElementById("infoImage");
+    const panelTitle = document.getElementById("panelTitle");
+    const panelContent = document.getElementById("panelContent");
 
     const rows = 11;
     const cols = 15;
 
     let selectedCell = null;
 
-    // Example "database" of images/descriptions
-    function getCellData(row, col, cellNumber) {
-      return {
-        img: `https://picsum.photos/seed/${cellNumber}/400/250`,
-        desc: `This is some example information for Row ${row}, Column ${col} (Cell ${cellNumber}).`
-      };
+    async function loadFolderData(line, col) {
+      const folderName = `${line}_${col}`;
+      const folderPath = `data/${folderName}`;
+
+      panelTitle.textContent = `Data for ${folderName}`;
+      panelContent.innerHTML = `<p>Loading...</p>`;
+
+      try {
+        // Try loading the manifest.json
+        const response = await fetch(`${folderPath}/manifest.json`);
+
+        if (!response.ok) {
+          throw new Error("No manifest file");
+        }
+
+        const manifest = await response.json();
+
+        // Title + details
+        panelTitle.textContent = manifest.title || `Data for ${folderName}`;
+
+        let html = "";
+
+        if (manifest.details) {
+          html += `<div class="details"><strong>Details:</strong><br>${manifest.details}</div>`;
+        }
+
+        // Figures
+        if (manifest.figures && manifest.figures.length > 0) {
+          manifest.figures.forEach(fig => {
+            html += `<img class="figure" src="${folderPath}/${fig}" alt="Figure">`;
+          });
+        } else {
+          html += `<p class="no-data">No figures found in folder.</p>`;
+        }
+
+        panelContent.innerHTML = html;
+
+      } catch (err) {
+        panelTitle.textContent = `Data for ${folderName}`;
+        panelContent.innerHTML = `<p class="no-data">No data measured</p>`;
+      }
     }
 
-    for (let r = 1; r <= rows; r++) {
-      for (let c = 1; c <= cols; c++) {
+    // Build the grid
+    for (let line = 1; line <= rows; line++) {
+      for (let col = 1; col <= cols; col++) {
         const cell = document.createElement("div");
         cell.className = "cell";
 
-        const cellNumber = (r - 1) * cols + c;
+        cell.title = `Line ${line}, Column ${col}`;
 
-        cell.setAttribute("data-info", `R${r}, C${c}`);
-
-        // CLICK EVENT
         cell.addEventListener("click", () => {
-          // Remove highlight from old selection
-          if (selectedCell) {
-            selectedCell.classList.remove("selected");
-          }
-
-          // Highlight new selection
+          if (selectedCell) selectedCell.classList.remove("selected");
           cell.classList.add("selected");
           selectedCell = cell;
 
-          // Load data
-          const data = getCellData(r, c, cellNumber);
-
-          // Update right panel
-          infoRow.textContent = r;
-          infoCol.textContent = c;
-          infoCell.textContent = cellNumber;
-          infoDesc.textContent = data.desc;
-          infoImage.src = data.img;
+          loadFolderData(line, col);
         });
 
         circleGrid.appendChild(cell);
