@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Circle Grid Folder Viewer</title>
+  <title>Grid Folder Viewer</title>
 
   <style>
     body {
@@ -30,10 +30,6 @@
       overflow-y: auto;
     }
 
-    .right h2 {
-      margin-top: 0;
-    }
-
     .circle {
       width: 400px;
       height: 400px;
@@ -41,7 +37,6 @@
       overflow: hidden;
       border: 3px solid black;
       background: white;
-      position: relative;
     }
 
     .grid {
@@ -50,15 +45,12 @@
       display: grid;
       grid-template-columns: repeat(15, 1fr);
       grid-template-rows: repeat(11, 1fr);
-
       transform: translateY(calc((100% / 11) * 0.38)) rotate(180deg);
     }
 
     .cell {
       border: 1px solid rgba(0, 0, 0, 0.3);
-      box-sizing: border-box;
       cursor: pointer;
-      position: relative;
     }
 
     .cell:hover {
@@ -72,8 +64,8 @@
     .figure {
       width: 100%;
       max-width: 500px;
+      margin-bottom: 12px;
       border-radius: 10px;
-      margin-bottom: 15px;
       border: 2px solid #ccc;
     }
 
@@ -82,104 +74,91 @@
       color: darkred;
       font-weight: bold;
     }
-
-    .details {
-      background: #f7f7f7;
-      border: 1px solid #ddd;
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 15px;
-    }
   </style>
 </head>
 
 <body>
 
-  <!-- LEFT SIDE -->
+  <!-- LEFT -->
   <div class="left">
     <div class="circle">
-      <div class="grid" id="circleGrid"></div>
+      <div class="grid" id="grid"></div>
     </div>
   </div>
 
-  <!-- RIGHT SIDE -->
+  <!-- RIGHT -->
   <div class="right">
-    <h2 id="panelTitle">Click a square</h2>
-    <div id="panelContent">
-      <p>Select a square to load data.</p>
-    </div>
+    <h2 id="title">Click a square</h2>
+    <div id="content"></div>
   </div>
 
   <script>
-    const circleGrid = document.getElementById("circleGrid");
-    const panelTitle = document.getElementById("panelTitle");
-    const panelContent = document.getElementById("panelContent");
+    const grid = document.getElementById("grid");
+    const title = document.getElementById("title");
+    const content = document.getElementById("content");
 
     const rows = 11;
     const cols = 15;
 
-    let selectedCell = null;
+    let selected = null;
 
-    async function loadFolderData(line, col) {
-      const folderName = `${line}_${col}`;
-      const folderPath = `data/${folderName}`;
+    function loadFolder(line, col) {
+      const folder = `data/${line}_${col}`;
+      title.textContent = `${line}_${col}`;
+      content.innerHTML = `<p>Loading...</p>`;
 
-      panelTitle.textContent = `Data for ${folderName}`;
-      panelContent.innerHTML = `<p>Loading...</p>`;
+      const images = [];
+      let loadedCount = 0;
+      let validImages = 0;
 
-      try {
-        // Try loading the manifest.json
-        const response = await fetch(`${folderPath}/manifest.json`);
+      for (let i = 1; i <= 10; i++) {
+        const img = new Image();
+        img.className = "figure";
+        img.src = `${folder}/fig${i}.jpg`;
 
-        if (!response.ok) {
-          throw new Error("No manifest file");
+        img.onload = () => {
+          validImages++;
+          images.push(img);
+          checkDone();
+        };
+
+        img.onerror = () => {
+          checkDone();
+        };
+      }
+
+      function checkDone() {
+        loadedCount++;
+
+        if (loadedCount === 10) {
+          if (validImages === 0) {
+            content.innerHTML = `<p class="no-data">No data measured</p>`;
+          } else {
+            content.innerHTML = "";
+            images.sort((a, b) =>
+              a.src.localeCompare(b.src, undefined, { numeric: true })
+            );
+            images.forEach(img => content.appendChild(img));
+          }
         }
-
-        const manifest = await response.json();
-
-        // Title + details
-        panelTitle.textContent = manifest.title || `Data for ${folderName}`;
-
-        let html = "";
-
-        if (manifest.details) {
-          html += `<div class="details"><strong>Details:</strong><br>${manifest.details}</div>`;
-        }
-
-        // Figures
-        if (manifest.figures && manifest.figures.length > 0) {
-          manifest.figures.forEach(fig => {
-            html += `<img class="figure" src="${folderPath}/${fig}" alt="Figure">`;
-          });
-        } else {
-          html += `<p class="no-data">No figures found in folder.</p>`;
-        }
-
-        panelContent.innerHTML = html;
-
-      } catch (err) {
-        panelTitle.textContent = `Data for ${folderName}`;
-        panelContent.innerHTML = `<p class="no-data">No data measured</p>`;
       }
     }
 
-    // Build the grid
-    for (let line = 1; line <= rows; line++) {
-      for (let col = 1; col <= cols; col++) {
+    // build grid
+    for (let r = 1; r <= rows; r++) {
+      for (let c = 1; c <= cols; c++) {
         const cell = document.createElement("div");
         cell.className = "cell";
 
-        cell.title = `Line ${line}, Column ${col}`;
-
         cell.addEventListener("click", () => {
-          if (selectedCell) selectedCell.classList.remove("selected");
+          if (selected) selected.classList.remove("selected");
           cell.classList.add("selected");
-          selectedCell = cell;
+          selected = cell;
 
-          loadFolderData(line, col);
+          loadFolder(r, c);
         });
 
-        circleGrid.appendChild(cell);
+        grid.appendChild(cell);
       }
     }
   </script>
