@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grid Folder Viewer</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+    }
+
+    .left {
+      width: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #f0f0f0;
+    }
+
+    .right {
+      width: 50%;
+      padding: 20px;
+      background: white;
+      border-left: 2px solid black;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+
+ .circle {
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  border: 3px solid black;
+  background: white;
+  position: relative;
+  overflow: hidden; /* keep lines inside */
+}
+
+/* Vertical line 
+.circle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  background: black;
+  transform: translateX(-50%);
+  z-index: 200;
+}*/
+
+/* Horizontal line */
+.circle::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  background: red;
+  transform: translateY(-50%);
+  z-index: 200;
+}
+
+/* 54 degree line */
+.cr-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;  /* bigger than circle so it spans fully */
+  height: 2px;
+  background: red;
+  transform: translate(-50%, -50%) rotate(54deg);
+  z-index: 200;
+}
+/* 54 degree line */
+.mn-line {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 600px;  /* bigger than circle so it spans fully */
+  height: 2px;
+  background: red;
+  transform: translate(-50%, -50%) rotate(126deg);
+  z-index: 200;
+}
+    .grid {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(15, 1fr);
+      grid-template-rows: repeat(11, 1fr);
+      transform: translateY(calc((100% / 11) * (1-0.38)));
+    }
+
+    .cell {
+      border: 1px solid rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+    }
+
+    .cell:hover {
+      background: rgba(0, 150, 255, 0.3);
+    }
+    .cell {
+    position: relative;
+    }
+
+    .cell::after {
+    content: attr(data-info);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -130%);
+    background: black;
+    color: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 5px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 50;
+    }
+
+    .cell:hover::after {
+    opacity: 1;
+    }
+    .cell.selected {
+      background: rgba(255, 150, 0, 0.5);
+    }
+
+    .figure {
+      width: 100%;
+      max-width: 500px;
+      margin-bottom: 12px;
+      border-radius: 10px;
+      border: 2px solid #ccc;
+    }
+
+    .no-data {
+      font-size: 18px;
+      color: darkred;
+      font-weight: bold;
+    }
+        
+    .cell {
+        border: 1px solid rgba(0, 0, 0, 0.3);
+        cursor: pointer;
+        position: relative;
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        font-size: 9px;
+        font-weight: bold;
+        color: black;
+}
+  </style>
+</head>
+
+<body>
+
+  <!-- LEFT -->
+  <div class="left">
+    <div class="circle">
+    <div class="mn-line"></div>
+    <!-- <div class="mn-line"></div> -->
+    <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <h2 id="title">Click a square</h2>
+    <div id="content"></div>
+  </div>
+
+  <script>
+    const grid = document.getElementById("grid");
+    const title = document.getElementById("title");
+    const content = document.getElementById("content");
+
+    const rows = 11;
+    const cols = 15;
+
+    let selected = null;
+
+    function loadFolder(line, col) {
+      const folder = `data/${line}_${col}`;
+      title.textContent = `${line}_${col}`;
+      content.innerHTML = `<p>Loading...</p>`;
+
+      const images = [];
+      let loadedCount = 0;
+      let validImages = 0;
+
+      for (let i = 1; i <= 10; i++) {
+        const img = new Image();
+        img.className = "figure";
+        img.src = `${folder}/fig${i}.jpg`;
+
+        img.onload = () => {
+          validImages++;
+          images.push(img);
+          checkDone();
+        };
+
+        img.onerror = () => {
+          checkDone();
+        };
+      }
+
+      function checkDone() {
+        loadedCount++;
+
+        if (loadedCount === 10) {
+          if (validImages === 0) {
+            content.innerHTML = `<p class="no-data">No data measured</p>`;
+          } else {
+            content.innerHTML = "";
+            images.sort((a, b) =>
+              a.src.localeCompare(b.src, undefined, { numeric: true })
+            );
+            images.forEach(img => content.appendChild(img));
+          }
+        }
+      }
+    }
+
+    // build grid
+    for (let r = 1; r <= rows; r++) {
+      for (let c = 1; c <= cols; c++) {
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        
+        cell.textContent = `${r},${c}`;
+                // Hover tooltip text
+        cell.setAttribute("data-info", `Row: ${r}, Col: ${c}`);
+
+        cell.addEventListener("click", () => {
+          if (selected) selected.classList.remove("selected");
+          cell.classList.add("selected");
+          selected = cell;
+
+          loadFolder(r, c);
+        });
+
+        grid.appendChild(cell);
+      }
+    }
+    
+    // ---------- LOAD TEXT FILE ----------
+  fetch(`${folder}/info.txt`)
+    .then(res => {
+      if (!res.ok) throw new Error("No text");
+      return res.text();
+    })
+    .then(text => {
+      window.currentText = text;
+    })
+    .catch(() => {
+      window.currentText = null;
+    });
+
+  // ---------- RENDER ----------
+  function renderContent() {
+    content.innerHTML = "";
+
+    if (validImages === 0) {
+      content.innerHTML = `<p class="no-data">No data measured</p>`;
+      return;
+    }
+
+    images.sort((a, b) =>
+      a.src.localeCompare(b.src, undefined, { numeric: true })
+    );
+
+    images.forEach(img => content.appendChild(img));
+
+    // Add text under images
+    const textBox = document.createElement("div");
+    textBox.style.marginTop = "10px";
+    textBox.style.padding = "10px";
+    textBox.style.borderTop = "1px solid #ccc";
+
+    textBox.textContent =
+      window.currentText || "No description available.";
+
+    content.appendChild(textBox);
+  }
+}
+  </script>
+
+</body>
+</html>
